@@ -18,6 +18,11 @@ Usage (once implemented):
     print(result["error"])   # None on success
 """
 
+import json
+import os
+
+from groq import Groq
+
 from tools import search_listings, suggest_outfit, create_fit_card
 
 
@@ -92,9 +97,67 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     Before writing code, complete the Planning Loop and State Management sections
     of planning.md — your implementation should match what you described there.
     """
-    # TODO: implement the planning loop
     session = _new_session(query, wardrobe)
-    session["error"] = "Planning loop not yet implemented."
+
+    # Step 1: Parse query with LLM (low temperature) → session["parsed"]
+    try:
+        client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+        parse_prompt = (
+            f"Extract the following from this clothing search query and return ONLY a JSON object "
+            f"with keys: description, size, max_price. "
+            f"Use null for size and max_price if not mentioned. max_price must be a number or null. "
+            f"Query: \"{query}\""
+        )
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": parse_prompt}],
+            temperature=0.1,
+        )
+        raw = response.choices[0].message.content.strip()
+        if "```" in raw:
+            raw = raw.split("```")[1].lstrip("json").strip()
+        parsed = json.loads(raw)
+        session["parsed"] = {
+            "description": parsed.get("description") or query,
+            "size": parsed.get("size") or None,
+            "max_price": float(parsed["max_price"]) if parsed.get("max_price") else None,
+        }
+    except Exception:
+        session["parsed"] = {"description": query, "size": None, "max_price": None}
+
+    # Step 2: Search listings → session["search_results"] and session["selected_item"]
+    session["search_results"] = search_listings(
+        session["parsed"]["description"],
+        size=session["parsed"]["size"],
+        max_price=session["parsed"]["max_price"],
+    )
+
+    if not session["search_results"]:
+        session["error"] = (
+            "No listings matched your search. "
+            "Try a broader description, a different size, or a higher price limit."
+        )
+        return session
+
+    session["selected_item"] = session["search_results"][0]
+
+    # Step 3: Suggest outfit → session["outfit_suggestion"]
+    outfit = suggest_outfit(session["selected_item"], session["wardrobe"])
+
+    if outfit.startswith("FitFindr found your item but was unable to generate a styling suggestion"):
+        session["error"] = outfit
+        return session
+
+    session["outfit_suggestion"] = outfit
+
+    # Step 4: Create fit card → session["fit_card"]
+    fit_card = create_fit_card(session["outfit_suggestion"], session["selected_item"])
+
+    if fit_card.startswith("FitFindr found your item but was unable to generate a fit caption"):
+        session["error"] = fit_card
+        return session
+
+    session["fit_card"] = fit_card
     return session
 
 
