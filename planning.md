@@ -15,7 +15,7 @@ You must have at least 3 tools. The three required tools are listed — add any 
 ### Tool 1: search_listings
 
 **What it does:**
-The user's input is used by the agent to extract 3 things: the description of the clothing they want, the size they want for that clothing item, and the max_price they are willing to pay for it. The tool/function search_listings() then uses these 3 extracted attributes as input parameters and returns the top 3 clothing items from the listings which match the input parameters.
+The user's input is used by the agent to extract 3 things: the description of the clothing they want, the size they want for that clothing item, and the max_price they are willing to pay for it. The tool/function search_listings() then uses these 3 extracted attributes as input parameters and returns all matching clothing items from the listings sorted by relevance.
 
 **Input parameters:**
 - `description` (str): The description of the clothing the user wants.
@@ -23,7 +23,7 @@ The user's input is used by the agent to extract 3 things: the description of th
 - `max_price` (float): The maximum price the user is willing to pay for this clothing item.
 
 **What it returns:**
-The function/tool returns the top 3 matches as a list of dictionaries sorted by relevance (relevance will be measured by finding a score of how many paramters directly matched with the item) from the listings according to the input paramters it received. Each dictionary includes fields {"id", "title", "description", "category", "style_tags", "size", "condition", "price", "colors", "brand", "platform"}.
+The function/tool returns all matches as a list of dictionaries sorted by relevance (relevance is measured by counting how many keywords from the description appear in the listing's title, description, category, and style_tags). Listings with a score of 0 are dropped. Each dictionary includes fields {"id", "title", "description", "category", "style_tags", "size", "condition", "price", "colors", "brand", "platform"}.
 
 **What happens if it fails or returns nothing:**
 If the tool fails or returns nothing, then the user is told to try some other attributes because the attributes they gave were not matched with any listings. Also, the agent stops the loop here and does not call the next function (suggest_outfit()).
