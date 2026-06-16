@@ -108,41 +108,57 @@ For each tool, describe the specific failure mode you're handling and what the a
 
 | Tool | Failure mode | Agent response |
 |------|-------------|----------------|
-| search_listings | No results match the query | |
-| suggest_outfit | Wardrobe is empty | |
-| create_fit_card | Outfit input is missing or incomplete | |
+| search_listings | No results match the query | "Try some other attributes because the attributes you gave were not matched with any listings." |
+| suggest_outfit | 1. Wardrobe is empty 2. LLM error | 1. general styling advice for the item instead of wardrobe-specific combinations 2. "FitFindr found your item but was unable to generate a styling suggestion. The item found was: {title} — ${price} on {platform}." |
+| create_fit_card | 1. Outfit input is missing or incomplete 2. LLM error | 1. "No outfit suggestion was available to generate a caption from." 2. "FitFindr found your item but was unable to generate a fit caption. The item was: {title} — ${price} on {platform}." |
 
 ---
 
 ## Architecture
 
-<!-- Draw a diagram of your agent showing how the components connect:
-     User input → Planning Loop → Tools (search_listings, suggest_outfit, create_fit_card)
-                                                                          ↕
-                                                                   State / Session
-     Show what triggers each tool, how state flows between them, and where error paths branch off.
-     ASCII art, a Mermaid diagram (https://mermaid.js.org/syntax/flowchart.html), or an embedded
-     sketch are all fine. You'll share this diagram with an AI tool when asking it to implement
-     the planning loop and each individual tool. -->
+```mermaid
+flowchart TD
+    A([User Query]) --> B[Planning Loop]
+
+    B --> C["Parse query with LLM (low temp)\nExtract description, size, max_price\nStore in session[parsed]"]
+
+    C --> D["search_listings(description, size, max_price)"]
+
+    D --> E{Results empty?}
+    E -- Yes --> F["session[error] = 'No listings matched'\nReturn session early"]
+    E -- No --> G["session[search_results] = results\nsession[selected_item] = results[0]"]
+
+    G --> H["suggest_outfit(selected_item, wardrobe)"]
+
+    H --> I{LLM error?}
+    I -- Yes --> J["session[error] = 'Unable to suggest outfit'\nReturn session early"]
+    I -- No --> K["session[outfit_suggestion] = suggestion"]
+
+    K --> L["create_fit_card(outfit_suggestion, selected_item)"]
+
+    L --> M{LLM error?}
+    M -- Yes --> N["session[error] = 'Unable to generate fit card'\nReturn session early"]
+    M -- No --> O["session[fit_card] = caption"]
+
+    O --> P([Return session])
+
+    style F fill:#f88,stroke:#c00
+    style J fill:#f88,stroke:#c00
+    style N fill:#f88,stroke:#c00
+    style P fill:#8f8,stroke:#080
+```
 
 ---
 
 ## AI Tool Plan
 
-<!-- For each part of the implementation below, describe:
-     - Which AI tool you plan to use (Claude, Copilot, ChatGPT, etc.)
-     - What you'll give it as input (which sections of this planning.md, your agent diagram)
-     - What you expect it to produce
-     - How you'll verify the output matches your spec before moving on
-
-     "I'll use AI to help me code" is not a plan.
-     "I'll give Claude my Tool 1 spec (inputs, return value, failure mode) and ask it to implement
-     search_listings() using load_listings() from the data loader — then test it against 3 queries
-     before trusting it" is a plan. -->
-
 **Milestone 3 — Individual tool implementations:**
 
+I'll use Claude for all 3 tools one at a time. For each tool I'll give it the tool spec from this planning.md and ask it to implement it using the existing helper functions. I'll verify each tool works by testing it with a few inputs before moving to the next one. For `search_listings` I'll test with different queries, for `suggest_outfit` I'll test with both an empty and a full wardrobe, and for `create_fit_card` I'll test with a normal outfit and an empty string.
+
 **Milestone 4 — Planning loop and state management:**
+
+I'll give Claude the Planning Loop section, State Management section, and the Architecture diagram and ask it to implement `run_agent()`. I'll verify by running the CLI test at the bottom of `agent.py` and checking that the happy path returns a fit card and the no-results path returns the error message. (Took help from Claude to write this)
 
 ---
 
@@ -153,14 +169,13 @@ Write out what a full user interaction looks like from start to finish — tool 
 **Example user query:** "I'm looking for a vintage graphic tee under $30. I mostly wear baggy jeans and chunky sneakers. What's out there and how would I style it?"
 
 **Step 1:**
-It takes the input and uses that input to extract information from it to use it in the search_listings() function. This function takes the name of the product, the size and the price as a parameter.
+The agent asks the LLM (low temperature) to parse the input and extract 3 things: description = "vintage graphic tee", size = None (not mentioned by user), max_price = 30.0. These are stored in `session["parsed"]` and passed to `search_listings()`.
 
 **Step 2:**
-<!-- What happens next? What was returned from step 1? What tool is called now? -->
-It returns the top 3 listing matched according to the paramters given to the search_listings function. FitFindr then picks the top result from these 3 suggested listings and gives it to suggest_outfit() which takes this top listing and the user's wardrobe as a parameter. This function is supposed to use these 2 inputs and returns a suggested outfit using the new item and the user's current wardrobe. This output is then given to the next create_fit_card() function.
+`search_listings()` returns a list of matching listing dicts sorted by relevance score, stored in `session["search_results"]`. FitFindr then picks the top result from this list and saves it in `session["selected_item"]`. `suggest_outfit()` is then called with `session["selected_item"]` and `session["wardrobe"]` as parameters. It returns a string with 1–2 outfit suggestions referencing specific wardrobe pieces by name, stored in `session["outfit_suggestion"]`. This output is then given to the next `create_fit_card()` function.
 
 **Step 3:**
-The create_fit_card() function will take the suggestion from suggest_outfit() and the new item as the paramter and use these to create a fit card which the user can use as a caption or something like that in their social media posts when they wear the item.
+`create_fit_card()` takes `session["outfit_suggestion"]` and `session["selected_item"]` as parameters. It calls the LLM at higher temperature and uses the item's title, price, and platform to generate a 2–4 sentence casual caption. The result is saved in `session["fit_card"]` and returned to the user.
 
 **Final output to user:**
 "thrifted this faded band tee off depop for $22 and honestly it was made for my wide-legs 🖤 full look in my stories"
