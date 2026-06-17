@@ -23,7 +23,7 @@ Then open the localhost URL shown in your terminal.
 
 ---
 
-## Architecture (Made using Mermaid)
+## Architecture (made using Mermaid)
 
 ```mermaid
 flowchart TD
