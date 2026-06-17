@@ -160,9 +160,10 @@ The tool returned the error string immediately without making an LLM call, which
 ## Spec Reflection
 
 **One way the spec helped you during implementation:**
-
+The session dict design in the State Management section made `run_agent()` straightforward to implement — because every key was named and its purpose was defined before any code was written, there was no ambiguity about what data to track or pass between tools.
 
 **One way your implementation diverged from the spec, and why:**
+The Tool 1 spec originally said "top 3 matches" but the implementation returns all matches sorted by relevance, with the planning loop picking `results[0]`. This was changed because limiting results inside the tool would make the tool itself less reusable. The selection decision belongs in the planning loop.
 
 
 ## AI Usage
@@ -170,21 +171,21 @@ The tool returned the error string immediately without making an LLM call, which
 **Instance 1**
 
 - *What I gave the AI:*
-
+I gave Claude my spec for each tool as I wrote them and asked it to tell me how to make it more specific or better before I wrote the next tool.
 
 - *What it produced:*
+It gave me suggestions on how I can make the current tool spec I am working on better and also what to focus on when writing the future tool specs.
 
-
-- *What I changed or overrode:*
-
-
+- *What I changed or overrode or added:*
+I changed my tool spec according to its suggestions and focused on those suggestions when writing the next tool spec.
 
 **Instance 2**
 
 - *What I gave the AI:*
-
+I gave Claude my planning.md file and instructions about how to make the README.md file and asked it to use that to help me write the README.md file. I did this so I do not have to re-do the same thing all over again.
 
 - *What it produced:*
+It produced a README.md with all the required headings and subheadings. Any data that it did not find in the planning.md file, it put placeholders for them so I can write thise myself.
 
-
-- *What I changed or overrode:*
+- *What I changed or overrode or added:*
+I wrote the information about the headings that were not in the planning.md file like **Spec Reflection** and **AI Usage**
