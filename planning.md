@@ -145,7 +145,7 @@ flowchart TD
     style F fill:#f88,stroke:#c00
     style J fill:#f88,stroke:#c00
     style N fill:#f88,stroke:#c00
-    style P fill:#8f8,stroke:#080
+    style P fill:#2d7a2d,stroke:#1a4d1a
 ```
 
 ---
